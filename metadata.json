@@ -1,0 +1,6 @@
+{
+  "name": "hommlyn247",
+  "description": "hommlyn247 - 24/7 Verified Domestic Help & Facility Services. Rapid dispatch for maids, cooks, babysitters, drivers, electricians, and plumbers with CarePlans warranty. Developed by TitanArtstudio, India.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,318 @@
+// Prisma Schema for hommlyn247 Premium Domestic Services Platform (MongoDB)
+// Reference: hommlyn247 architecture & 24/7 on-demand operations
+// Fully ready for `prisma generate` and `prisma db push` when you connect your MongoDB database.
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum ServiceCategory {
+  MAID
+  COOK
+  ELECTRICIAN
+  PLUMBER
+  DRIVER
+  SECURITY
+  NANNY
+  DEEP_CLEAN
+  APPLIANCE
+}
+
+enum BookingType {
+  INSTANT
+  SCHEDULED
+  SUBSCRIPTION
+}
+
+enum BookingStatus {
+  PENDING
+  ASSIGNED
+  EN_ROUTE
+  ARRIVED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum Frequency {
+  ONE_TIME
+  DAILY
+  ALTERNATE_DAYS
+  MONTHLY
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  REFUNDED
+  FAILED
+}
+
+enum PaymentMethod {
+  UPI
+  CARD
+  NETBANKING
+  CASH
+}
+
+// Embedded Task Definition
+type TaskOption {
+  id             String
+  name           String
+  priceDelta     Float
+  description    String?
+  defaultChecked Boolean @default(false)
+}
+
+// Embedded Customer Contact & Address Info
+type CustomerDetails {
+  name         String
+  phone        String
+  address      String
+  houseNumber  String
+  city         String
+  pincode      String
+  instructions String?
+}
+
+// Embedded Pricing Breakdown
+type PricingBreakdown {
+  baseAmount   Float
+  addOnsAmount Float
+  platformFee  Float
+  taxAmount    Float
+  discount     Float
+  total        Float
+}
+
+// Embedded Provider Verification Checklist
+type VerificationChecklist {
+  policeVerified     Boolean @default(true)
+  aadharVerified     Boolean @default(true)
+  trainingCertified  Boolean @default(true)
+  healthCheckPassed  Boolean @default(true)
+}
+
+// 1. Service Catalog Model
+model Service {
+  id                 String          @id @default(auto()) @map("_id") @db.ObjectId
+  slug               String          @unique
+  category           ServiceCategory
+  title              String
+  subtitle           String
+  tagline            String
+  basePrice          Float
+  unit               String          // e.g. "per hr", "per visit", "per month"
+  badge              String          // e.g. "15 Min Arrival"
+  eta                String          // e.g. "12-15 mins"
+  rating             Float           @default(4.9)
+  reviewsCount       Int             @default(0)
+  availableCount     Int             @default(10)
+  iconName           String
+  popular            Boolean         @default(false)
+  equipmentProvided  Boolean         @default(true)
+  includedHighlights String[]
+  tasks              TaskOption[]
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  bookings           Booking[]
+
+  @@map("services")
+}
+
+// 2. Domestic Helper / Worker Model
+model Helper {
+  id                String                @id @default(auto()) @map("_id") @db.ObjectId
+  helperCode        String                @unique // e.g. "HLP-101"
+  name              String
+  category          ServiceCategory
+  categoryTitle     String
+  photoUrl          String
+  rating            Float                 @default(5.0)
+  completedJobs     Int                   @default(0)
+  experienceYears   Int                   @default(1)
+  languages         String[]
+  hourlyRate        Float
+  isAvailable       Boolean               @default(true)
+  verification      VerificationChecklist
+  location          String
+  currentEtaMinutes Int                   @default(15)
+  bio               String
+  phone             String
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  bookings          Booking[]
+  reviews           Review[]
+  payouts           PartnerPayout[]
+
+  @@map("helpers")
+}
+
+// 3. Booking Model
+model Booking {
+  id                String             @id @default(auto()) @map("_id") @db.ObjectId
+  bookingRef        String             @unique // e.g. "SWIFT-9481"
+  serviceId         String             @db.ObjectId
+  service           Service            @relation(fields: [serviceId], references: [id])
+  category          ServiceCategory
+  serviceTitle      String
+  bookingType       BookingType        @default(INSTANT)
+  scheduledDate     String
+  scheduledTimeSlot String
+  durationHours     Float              @default(1.0)
+  frequency         Frequency          @default(ONE_TIME)
+  selectedTasks     String[]
+  customer          CustomerDetails
+  helperId          String?            @db.ObjectId
+  helper            Helper?            @relation(fields: [helperId], references: [id])
+  status            BookingStatus      @default(ASSIGNED)
+  otp               String             // 4-digit security code
+  paymentStatus     PaymentStatus      @default(PENDING)
+  paymentMethod     PaymentMethod      @default(UPI)
+  pricing           PricingBreakdown
+  notes             String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  transactions      PaymentTransaction[]
+  review            Review?
+
+  @@map("bookings")
+}
+
+// 4. Payment Transaction Ledger Model
+model PaymentTransaction {
+  id            String         @id @default(auto()) @map("_id") @db.ObjectId
+  txnRef        String         @unique // e.g. "TXN-948101"
+  bookingId     String         @db.ObjectId
+  booking       Booking        @relation(fields: [bookingId], references: [id])
+  amount        Float
+  currency      String         @default("INR")
+  method        PaymentMethod
+  status        PaymentStatus  @default(PAID)
+  referenceId   String         // Gateway reference e.g. "UPI/3891029481"
+  upiId         String?
+  cardLast4     String?
+  serviceTitle  String
+  customerName  String
+  timestamp     DateTime       @default(now())
+  invoiceUrl    String?
+
+  @@map("payment_transactions")
+}
+
+// 5. Customer Review & Rating Model
+model Review {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  bookingId  String   @unique @db.ObjectId
+  booking    Booking  @relation(fields: [bookingId], references: [id])
+  helperId   String   @db.ObjectId
+  helper     Helper   @relation(fields: [helperId], references: [id])
+  rating     Int      // 1 to 5
+  feedback   String?
+  createdAt  DateTime @default(now())
+
+  @@map("reviews")
+}
+
+// 6. Partner Daily Settlement & Payout Model
+model PartnerPayout {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  helperId      String    @db.ObjectId
+  helper        Helper    @relation(fields: [helperId], references: [id])
+  date          String    // YYYY-MM-DD
+  totalEarned   Float
+  jobsCompleted Int
+  payoutStatus  String    @default("SETTLED") // PENDING | SETTLED
+  settledAt     DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@map("partner_payouts")
+}
+
+// 7. User Account & Role Model
+enum UserRole {
+  CLIENT
+  PROVIDER
+  ADMIN
+}
+
+model User {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  email       String    @unique
+  phone       String
+  address     String
+  city        String    @default("Bangalore")
+  pincode     String    @default("560034")
+  role        UserRole  @default(CLIENT)
+  avatarUrl   String?
+  joinedDate  String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("users")
+}
+
+// 8. Care Plan & Monthly Subscription Model
+model CarePlan {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  title          String
+  pricePerMonth  Float
+  billingCycle   String   // monthly | quarterly | annual
+  badge          String
+  description    String
+  features       String[]
+  recommended    Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  @@map("careplans")
+}
+
+// 9. Promotional Coupon Model
+model Coupon {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  code           String   @unique
+  discountType   String   // percentage | flat
+  discountValue  Float
+  maxDiscount    Float?
+  minOrderAmount Float    @default(0)
+  description    String
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  @@map("coupons")
+}
+
+// 10. Announcement Banner Model
+model AnnouncementBanner {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  subtitle    String
+  badgeText   String
+  buttonText  String
+  isActive    Boolean  @default(true)
+  updatedAt   DateTime @updatedAt
+
+  @@map("announcements")
+}
+
+// 11. Transactional Email / Notification Log Model
+model TransactionalEmail {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  recipientEmail String
+  recipientName  String
+  subject        String
+  bodyPreview    String
+  type           String
+  timestamp      DateTime @default(now())
+
+  @@map("transactional_emails")
+}

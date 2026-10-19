@@ -1,0 +1,16 @@
+{
+  "name": "hommlyn247 - 24/7 Verified Domestic Services",
+  "short_name": "hommlyn247",
+  "description": "24/7 Instant verified domestic help, maids, cooks, facility services, and replacement CarePlans.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0F4A42",
+  "theme_color": "#0F4A42",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ]
+}
